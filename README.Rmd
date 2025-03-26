@@ -2,8 +2,6 @@
 output: github_document
 ---
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -18,38 +16,83 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of kobojanitor is to ...
+The goal of kobojanitor is to help with cleaning and transforming data downloaded from [KoboToolbox](https://eu.kobotoolbox.org). 
 
 ## Installation
 
 You can install the development version of kobojanitor from [GitHub](https://github.com/) with:
 
-``` r
+```{r, eval = FALSE}
 # install.packages("pak")
 pak::pak("bonschorno/kobojanitor")
 ```
 
-## Example
+## Examples
 
-This is a basic example which shows you how to solve a common problem:
-
-```{r example}
+```{r example, message=FALSE, warning=FALSE}
+library(robotoolbox)
+library(httr)
+library(tidyverse)
 library(kobojanitor)
-## basic example code
+
+# load raw Kobo data with robotoolbox's kobo_data function
+raw_data <- kobo_data(x = "aWtRoDGQCbMFZ9nzQ5BFw7",
+                      select_multiple_sep = "/")
+
+# retrieve the questionnaire
+response <- GET("https://github.com/Global-Health-Engineering/mwfertiliserpilot/raw/refs/heads/main/documents/fertilizer-management-pilot.xlsx")
+temp_file <- tempfile(fileext = ".xlsx")
+writeBin(content(response, "raw"), temp_file)
+kobo_questionnaire <- readxl::read_excel(temp_file)
+kobo_answer_options <- readxl::read_excel(temp_file, sheet = "choices") |> 
+  filter(list_name != "enumerator") |>
+  select(identifier = name,
+         label = `label::English (en)`) |>
+  drop_na() |>
+  mutate(label = ifelse(label == "Other (specify)", "Other", label)) |>
+  distinct(label, .keep_all = TRUE)
 ```
 
-What is special about using `README.Rmd` instead of just `README.md`? You can include R chunks like so:
+### Functions currently available with kobojanitor
 
-```{r cars}
-summary(cars)
+```{r}
+ls("package:kobojanitor")
 ```
 
-You'll still need to render `README.Rmd` regularly, to keep `README.md` up-to-date. `devtools::build_readme()` is handy for this.
+### Select meta variables
 
-You can also embed plots, for example:
+```{r}
+meta_variables <- select_meta_variables(raw_data)
 
-```{r pressure, echo = FALSE}
-plot(pressure)
+print(meta_variables)
 ```
 
-In that case, don't forget to commit and push the resulting figure files, so they display on GitHub and CRAN.
+### Select relevant variables by specifing their type (e.g., "integer")
+
+```{r}
+select_relevant_variables(questionnaire = kobo_questionnaire, variable_pattern = "integer|select_multiple")
+```
+
+## Cleaning pipeline
+
+```{r}
+clean_data <- raw_data |> 
+  delete_select_multiple_text(questionnaire = kobo_questionnaire) |> 
+  rename_multiple_select(variable_name = "own_livestock_animals", group_separator = "/", replacement = ".") |> 
+  transform_xml_to_label(dictionary = kobo_answer_options, exceptions = "own_livestock_animals")
+```
+
+```{r}
+clean_data |> 
+  select(contains("own_livestock_animals")) |> 
+  names()
+```
+
+```{r}
+unique(as.vector(raw_data$tool_topdressing_fertilizer))
+```
+
+```{r}
+unique(clean_data$tool_topdressing_fertilizer)
+```
+

@@ -15,11 +15,13 @@
 delete_select_multiple_text <- function(df, questionnaire){
 
   select_multiple_names <- questionnaire |>
-    dplyr::filter(grepl("select_multiple", .data$type)) |>
-    dplyr::pull(.data$name)
+    dplyr::filter(grepl("select_multiple", type)) |>
+    dplyr::pull(name)
 
   final_df <- df |>
     dplyr::select(-dplyr::all_of(select_multiple_names))
+
+  message(paste("The following multiple_select variables have been deleted:", select_multiple_names))
 
   return(final_df)
 
