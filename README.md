@@ -5,8 +5,12 @@
 
 <!-- badges: end -->
 
-The goal of kobojanitor is to help with cleaning and transforming data
-downloaded from [KoboToolbox](https://eu.kobotoolbox.org).
+The goal of kobojanitor is to make data cleaning downloaded from
+[KoboToolbox](https://eu.kobotoolbox.org) easier. It provides functions
+to select relevant/delete irrelevant meta data, select relevant variable
+types (e.g., `multiple_select` or `decimal`), rename `multiple_select`
+variables, and transform the XML codes for answer options to their
+corresponding labels to make working with the data easier.
 
 ## Installation
 
@@ -20,6 +24,15 @@ pak::pak("bonschorno/kobojanitor")
 
 ## Examples
 
+The data I’m fetching directly from the API is the raw data associated
+with
+[mwfertiliserpilot](%22https://github.com/Global-Health-Engineering/mwfertiliserpilot%22).
+While the raw data itself isn’t published here because it contains
+sensitive information, you can fetch the questionnaire fetched from the
+repository’s documents folder. The questionnaire is then used to 1)
+select relevant variables (from the “survey” sheet) and to transform the
+XML codes to their corresponding labels (based on the “choices” sheet).
+
 ``` r
 library(robotoolbox)
 library(httr)
@@ -30,11 +43,14 @@ library(kobojanitor)
 raw_data <- kobo_data(x = "aWtRoDGQCbMFZ9nzQ5BFw7",
                       select_multiple_sep = "/")
 
-# retrieve the questionnaire
+# retrieve the questionnaire from the mwfertiliserpilot repository
 response <- GET("https://github.com/Global-Health-Engineering/mwfertiliserpilot/raw/refs/heads/main/documents/fertilizer-management-pilot.xlsx")
 temp_file <- tempfile(fileext = ".xlsx")
 writeBin(content(response, "raw"), temp_file)
+
+
 kobo_questionnaire <- readxl::read_excel(temp_file)
+
 kobo_answer_options <- readxl::read_excel(temp_file, sheet = "choices") |> 
   filter(list_name != "enumerator") |>
   select(identifier = name,
@@ -44,7 +60,7 @@ kobo_answer_options <- readxl::read_excel(temp_file, sheet = "choices") |>
   distinct(label, .keep_all = TRUE)
 ```
 
-### Functions currently available with kobojanitor
+As of now, the package provides the following functions:
 
 ``` r
 ls("package:kobojanitor")
@@ -77,7 +93,10 @@ select_relevant_variables(questionnaire = kobo_questionnaire, variable_pattern =
 #> [13] "wtp_scoop"                     "price_scoop"
 ```
 
-## Cleaning pipeline
+## Pipeline
+
+A nice feature of `kobojanitor` is that it allows you to chain functions
+together to create a pipeline.
 
 ``` r
 clean_data <- raw_data |> 
@@ -88,6 +107,7 @@ clean_data <- raw_data |>
 ```
 
 ``` r
+# multiple select variables have been renamed
 clean_data |> 
   select(contains("own_livestock_animals")) |> 
   names()
@@ -97,12 +117,14 @@ clean_data |>
 ```
 
 ``` r
+# before: XML codes
 unique(as.vector(raw_data$tool_topdressing_fertilizer))
 #> [1] "bottle_lining"    "bottle_no_lining" "other"            "teaspoon"        
 #> [5] "hands"            "fertilizer_scoop" NA
 ```
 
 ``` r
+# after: labels
 unique(clean_data$tool_topdressing_fertilizer)
 #> [1] "Metal bottle top with the lining (e.g., Fanta, Coca Cola, etc.)"   
 #> [2] "Metal bottle top without the lining (e.g., Fanta, Coca Cola, etc.)"
